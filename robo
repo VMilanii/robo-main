@@ -1,0 +1,142 @@
+#include <stdio.h>
+
+#include <webots/robot.h>
+
+#include <webots/motor.h>
+
+#include <webots/distance_sensor.h>
+
+#include <webots/led.h>
+
+#include <webots/supervisor.h>
+
+#define TIME_STEP 256
+#define QtddSensoresProx 8
+#define QtddLeds 10
+
+int main(int argc, char ** argv) {
+
+    int i = 0;
+    double LeituraSensorProx[QtddSensoresProx];
+    double AceleradorDireito = 1.0, AceleradorEsquerdo = 1.0;
+    
+    wb_robot_init();
+
+    //configurei MOTORES
+    WbDeviceTag MotorEsquerdo, MotorDireito;
+
+    MotorEsquerdo = wb_robot_get_device("left wheel motor");
+    MotorDireito = wb_robot_get_device("right wheel motor");
+
+    wb_motor_set_position(MotorEsquerdo, INFINITY);
+    wb_motor_set_position(MotorDireito, INFINITY);
+
+    wb_motor_set_velocity(MotorEsquerdo, 0);
+    wb_motor_set_velocity(MotorDireito, 0);
+
+    WbNodeRef robot_node = wb_supervisor_node_get_self(); //captura o supervisor e o nome atribuido para o robo foi "e-puck"
+    WbFieldRef trans_field = wb_supervisor_node_get_field(robot_node, "translation"); //identifica o campo de posição
+
+    const double * posicao; //variáel que vai receber a posição do robo
+
+    //configurei Sensores de Proximidade
+    WbDeviceTag SensorProx[QtddSensoresProx];
+
+    SensorProx[0] = wb_robot_get_device("ps0");
+    SensorProx[1] = wb_robot_get_device("ps1");
+    SensorProx[2] = wb_robot_get_device("ps2");
+    SensorProx[3] = wb_robot_get_device("ps3");
+    SensorProx[4] = wb_robot_get_device("ps4");
+    SensorProx[5] = wb_robot_get_device("ps5");
+    SensorProx[6] = wb_robot_get_device("ps6");
+    SensorProx[7] = wb_robot_get_device("ps7");
+
+    wb_distance_sensor_enable(SensorProx[0], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[1], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[2], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[3], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[4], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[5], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[6], TIME_STEP);
+    wb_distance_sensor_enable(SensorProx[7], TIME_STEP);
+
+    //config leds
+    WbDeviceTag Leds[QtddLeds];
+    Leds[0] = wb_robot_get_device("led0");
+    wb_led_set(Leds[0], -1);
+
+    /*
+     * You should declare here WbDeviceTag variables for storing
+     * robot devices like this:
+     *  WbDeviceTag my_sensor = wb_robot_get_device("my_sensor");
+     *  WbDeviceTag my_actuator = wb_robot_get_device("my_actuator");
+     */
+
+    /* main loop
+     * Perform simulation steps of TIME_STEP milliseconds
+     * and leave the loop when the simulation is over
+     */
+    while (wb_robot_step(TIME_STEP) != -1) {
+     
+      for (i = 0; i < QtddSensoresProx; i++) {
+        LeituraSensorProx[i] = wb_distance_sensor_get_value(SensorProx[i]) - 60;
+        //sprintf(texto,"%s|%d: %5.2f  ",texto,i,LeituraSensorProx[i]);
+      }
+      
+      wb_led_set(Leds[0], wb_led_get(Leds[0]) * -1);
+      /*
+       * Enter here functions to send actuator commands, like:
+       * wb_motor_set_position(my_actuator, 10.0);
+       */
+
+      posicao = wb_supervisor_field_get_sf_vec3f(trans_field);
+      printf("Posição do robo | x= %.2f | y= %.2f | z= %.2f |\n", posicao[0], posicao[1], posicao[2]);
+
+      if (
+        (posicao[0] < 0.10 && posicao[0] > -0.03 &&
+        posicao[2] < -0.17 && posicao[2] > -0.33) ||
+       
+        (posicao[0] < -0.28 && posicao[0] > -0.34 &&
+        posicao[2] < 0.22 && posicao[2] > 0.17)
+        
+        ) {
+           AceleradorDireito = 1;
+           AceleradorEsquerdo = 1;
+
+           printf("\n\n\tColidiu com a caixa!!!\n\n");
+         } 
+        else if (LeituraSensorProx[0] > 100) {
+          AceleradorDireito = 1;
+          AceleradorEsquerdo = -0.62;
+        } else if (LeituraSensorProx[1] > 100) {
+          AceleradorDireito = 1;
+          AceleradorEsquerdo = -0.64;
+        } else if (LeituraSensorProx[2] > 100) {
+          AceleradorDireito = 1;
+          AceleradorEsquerdo = -0.69;
+        } else if (LeituraSensorProx[5] > 100) {
+          AceleradorDireito = -0.68;
+          AceleradorEsquerdo = 1;
+        } else if (LeituraSensorProx[6] > 100) {
+          AceleradorDireito = -0.62;
+          AceleradorEsquerdo = 1;
+        } else if (LeituraSensorProx[7] > 100) {
+          AceleradorDireito = -0.64;
+          AceleradorEsquerdo = 1;
+        } else {
+          AceleradorDireito = 1;
+          AceleradorEsquerdo = 1;
+        }
+
+        wb_motor_set_velocity(MotorEsquerdo, 6.28 * AceleradorEsquerdo);
+        wb_motor_set_velocity(MotorDireito, 6.28 * AceleradorDireito);
+
+      };
+
+      /* Enter your cleanup code here */
+
+      /* This is necessary to cleanup webots resources */
+      wb_robot_cleanup();
+
+      return 0;
+    }
